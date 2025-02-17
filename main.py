@@ -33,8 +33,9 @@ def get_process_name(pid):
         return None
 
 
-async def take_screenshot():
-    await asyncio.sleep(0.125)
+def take_screenshot():
+    # await asyncio.sleep(0.125)
+    # time.sleep(0.125)
     """Создает скриншот экрана и сохраняет его в папку screenshots."""
     timestamp = time.strftime("%d.%m.%Y_%H-%M-%S")
     screenshot_dir = './recorder/screenshots'
@@ -55,6 +56,7 @@ async def take_screenshot():
     # print(f"[Скриншот] Сохранен: {screenshot_path}")
     return screenshot
 class App:
+    prev_windows = get_open_windows()
     def __init__(self, root):
         self.root = root
         self.root.title("Ботяра")
@@ -64,7 +66,7 @@ class App:
         self.enabled = tk.BooleanVar(value=False)
 
         # Виджеты
-        tk.Label(root, text="Автоотключение после срабатывания").pack()
+        tk.Label(root, text="Сработал - приостановить бота").pack()
         self.auto_disable_button = tk.Button(root, text="Откл.", command=self.toggle_auto_disable)
         self.auto_disable_button.pack()
 
@@ -75,8 +77,12 @@ class App:
 
 
         self.update_ui()
-        self.loop = asyncio.new_event_loop()
-        self.loop.run_until_complete(self.scanner_thread())
+        # self.loop = asyncio.new_event_loop()
+        # self.task = self.loop.create_task(self.scanner_thread())
+        # self.task.
+        # self.task = asyncio.create_task(self.scanner_thread())
+        # self.task.
+
 
 
     def toggle_auto_disable(self):
@@ -95,53 +101,60 @@ class App:
             self.status_label.config(text="Выключено", fg="red")
             self.toggle_button.config(text="Включить", bg="green")
 
-    async def scanner_thread(self):
-        prev_windows = get_open_windows()
+    def scanner_thread(self):
+        # print("tick")
 
-        while True:
-            await asyncio.sleep(0.25)  # Интервал проверки
-            if not self.enabled.get():
-                continue
-            current_windows = get_open_windows()
-            needScreenshot = False
-            screenshot_path = None
-            records = []
-            # Определяем открытые новые окна
-            opened_windows = {hwnd: info for hwnd, info in current_windows.items() if hwnd not in prev_windows}
-            for hwnd, (title, pid) in opened_windows.items():
-                print(f"[Открыто] Заголовок: '{title}', PID: {pid}, Процесс: {get_process_name(pid)}")
-                needScreenshot = True
-                records.append((1, title, pid, get_process_name(pid), None))
-            # Определяем закрытые окна
-            closed_windows = {hwnd: info for hwnd, info in prev_windows.items() if hwnd not in current_windows}
-            for hwnd, (title, pid) in closed_windows.items():
-                print(f"[Закрыто] Заголовок: '{title}', PID: {pid}, Процесс: {get_process_name(pid)}")
-                records.append((2, title, pid, get_process_name(pid), None))
-            # Обновляем предыдущий список окон
-            prev_windows = current_windows
-            if needScreenshot:
-                print("[Уведомление] Создание скриншота...")
-                # Вызов функции для создания скриншота
-                screenshot = await take_screenshot()
-                screen_width, screen_height = screenshot.size
+        # while True:
+        # await asyncio.sleep(0.25)  # Интервал проверки
+        if not self.enabled.get():
+            self.prev_windows = get_open_windows()
 
-                # Координаты пикселя (80, 120) от правого нижнего угла
-                x = screen_width - 80
-                y = screen_height - 120
-                # Целевой цвет в RGB
-                target_color = (33, 143, 97)  # #218f61
-                pixel_color = screenshot.getpixel((x, y))
+            self.root.after(200, self.scanner_thread)
 
-                # Проверяем цвет и вызываем функцию
-                if pixel_color == target_color:
-                    if app.do_auto_disable.get():
-                        app.enabled.set(False)
-                    trigger_chat.main()
-            # if screenshot_path:
-                # records.append((-1, None, None, None, screenshot_path))
-            for record in records:
-                # create_record(*record)
-                print(record)
+            return
+        current_windows = get_open_windows()
+        needScreenshot = False
+        screenshot_path = None
+        records = []
+        # Определяем открытые новые окна
+        opened_windows = {hwnd: info for hwnd, info in current_windows.items() if hwnd not in self.prev_windows}
+        for hwnd, (title, pid) in opened_windows.items():
+            print(f"[Открыто] Заголовок: '{title}', PID: {pid}, Процесс: {get_process_name(pid)}")
+            needScreenshot = True
+            records.append((1, title, pid, get_process_name(pid), None))
+        # Определяем закрытые окна
+        closed_windows = {hwnd: info for hwnd, info in self.prev_windows.items() if hwnd not in current_windows}
+        for hwnd, (title, pid) in closed_windows.items():
+            print(f"[Закрыто] Заголовок: '{title}', PID: {pid}, Процесс: {get_process_name(pid)}")
+            records.append((2, title, pid, get_process_name(pid), None))
+        # Обновляем предыдущий список окон
+        prev_windows = current_windows
+        if needScreenshot:
+            # print("[Уведомление] Создание скриншота...")
+            # Вызов функции для создания скриншота
+            screenshot = take_screenshot()
+            screen_width, screen_height = screenshot.size
+
+            # Координаты пикселя (80, 120) от правого нижнего угла
+            x = screen_width - 80
+            y = screen_height - 120
+            # Целевой цвет в RGB
+            target_color = (33, 143, 97)  # #218f61
+            pixel_color = screenshot.getpixel((x, y))
+
+            # Проверяем цвет и вызываем функцию
+            if pixel_color == target_color:
+                if app.do_auto_disable.get():
+                    app.enabled.set(False)
+                trigger_chat.main()
+        # if screenshot_path:
+            # records.append((-1, None, None, None, screenshot_path))
+        # for record in records:
+            # create_record(*record)
+            # print(record)
+        self.prev_windows = get_open_windows()
+
+        self.root.after(200, self.scanner_thread)
 
 
 
@@ -149,4 +162,5 @@ class App:
 # Запуск
 root = tk.Tk()
 app = App(root)
+root.after(200, app.scanner_thread)
 root.mainloop()
